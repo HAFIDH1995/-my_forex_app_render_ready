@@ -33,68 +33,83 @@
   <div id="chart"></div>
 
   <script>
-    const chart = LightweightCharts.createChart(document.getElementById("chart"), {
-      width: window.innerWidth - 40,
-      height: 500,
-      layout: {
-        backgroundColor: "#ffffff",
-        textColor: "#333"
-      },
-      grid: {
-        vertLines: { color: "#eee" },
-        horzLines: { color: "#eee" }
-      },
-      timeScale: {
-        timeVisible: true,
-        secondsVisible: true
-      },
-    });
+    window.addEventListener("DOMContentLoaded", () => {
+      const chartEl = document.getElementById("chart");
+      const chart = LightweightCharts.createChart(chartEl, {
+        width: chartEl.clientWidth,
+        height: 500,
+        layout: {
+          backgroundColor: "#ffffff",
+          textColor: "#333"
+        },
+        grid: {
+          vertLines: { color: "#eee" },
+          horzLines: { color: "#eee" }
+        },
+        timeScale: {
+          timeVisible: true,
+          secondsVisible: true
+        },
+      });
 
-    const candleSeries = chart.addCandlestickSeries();
-    let bars = [];
-    let interval = 5;
-    let currentSymbol = "EUR/USD";
+      const candleSeries = chart.addCandlestickSeries();
+      let bars = [];
+      let interval = 5;
+      let currentSymbol = "EUR/USD";
 
-    function roundToInterval(date, seconds) {
-      return new Date(Math.floor(date.getTime() / (seconds * 1000)) * seconds * 1000);
-    }
-
-    const ws = new WebSocket("wss://my-forex-app.onrender.com/ws");
-    ws.onmessage = (e) => {
-      const { symbol, price, timestamp } = JSON.parse(e.data);
-      if (symbol !== currentSymbol) return;
-
-      const date = new Date(timestamp);
-      const time = roundToInterval(date, interval);
-      const ts = Math.floor(time.getTime() / 1000);
-
-      let lastBar = bars[bars.length - 1];
-      if (!lastBar || lastBar.time !== ts) {
-        bars.push({
-          time: ts,
-          open: price,
-          high: price,
-          low: price,
-          close: price,
-        });
-      } else {
-        lastBar.high = Math.max(lastBar.high, price);
-        lastBar.low = Math.min(lastBar.low, price);
-        lastBar.close = price;
+      function roundToInterval(date, seconds) {
+        return new Date(Math.floor(date.getTime() / (seconds * 1000)) * seconds * 1000);
       }
-      candleSeries.setData(bars);
-    };
 
-    document.getElementById("interval").addEventListener("change", (e) => {
-      interval = parseInt(e.target.value);
-      bars = [];
-      candleSeries.setData([]);
-    });
+      const ws = new WebSocket("wss://my-forex-app.onrender.com/ws");
+      ws.onopen = () => console.log("✅ WebSocket connected");
+      ws.onerror = (err) => console.error("❌ WebSocket error", err);
 
-    document.getElementById("symbol").addEventListener("change", (e) => {
-      currentSymbol = e.target.value;
-      bars = [];
-      candleSeries.setData([]);
+      ws.onmessage = (e) => {
+        try {
+          const { symbol, price, timestamp } = JSON.parse(e.data);
+          if (symbol !== currentSymbol) return;
+
+          const date = new Date(timestamp);
+          const time = roundToInterval(date, interval);
+          const ts = Math.floor(time.getTime() / 1000);
+
+          let lastBar = bars[bars.length - 1];
+          if (!lastBar || lastBar.time !== ts) {
+            bars.push({
+              time: ts,
+              open: price,
+              high: price,
+              low: price,
+              close: price,
+            });
+          } else {
+            lastBar.high = Math.max(lastBar.high, price);
+            lastBar.low = Math.min(lastBar.low, price);
+            lastBar.close = price;
+          }
+          candleSeries.setData(bars);
+        } catch (err) {
+          console.error("خطأ في تحليل البيانات:", err);
+        }
+      };
+
+      document.getElementById("interval").addEventListener("change", (e) => {
+        interval = parseInt(e.target.value);
+        bars = [];
+        candleSeries.setData([]);
+      });
+
+      document.getElementById("symbol").addEventListener("change", (e) => {
+        currentSymbol = e.target.value;
+        bars = [];
+        candleSeries.setData([]);
+      });
+
+      // responsive resize
+      window.addEventListener("resize", () => {
+        chart.resize(chartEl.clientWidth, 500);
+      });
     });
   </script>
 </body>
