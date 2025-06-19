@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Live Forex Chart</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    #chart { width: 100%; height: 500px; }
+    #controls { margin-bottom: 20px; }
+  </style>
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+  <h1>Live Forex Candlestick Chart</h1>
+
+  <div id="controls">
+    <label for="symbol">Symbol:</label>
+    <select id="symbol">
+      <option value="EUR/USD">EUR/USD</option>
+      <option value="GBP/USD">GBP/USD</option>
+      <option value="USD/JPY">USD/JPY</option>
+    </select>
+
+    <label for="interval">Interval:</label>
+    <select id="interval">
+      <option value="5">5s</option>
+      <option value="15">15s</option>
+      <option value="60">1m</option>
+      <option value="300">5m</option>
+    </select>
+  </div>
+
+  <div id="chart"></div>
+
+  <script>
+    const chart = LightweightCharts.createChart(document.getElementById("chart"), {
+      width: window.innerWidth - 40,
+      height: 500,
+      layout: {
+        backgroundColor: "#ffffff",
+        textColor: "#333"
+      },
+      grid: {
+        vertLines: { color: "#eee" },
+        horzLines: { color: "#eee" }
+      },
+      timeScale: {
+        timeVisible: true,
+        secondsVisible: true
+      },
+    });
+
+    const candleSeries = chart.addCandlestickSeries();
+    let bars = [];
+    let interval = 5;
+    let currentSymbol = "EUR/USD";
+
+    function roundToInterval(date, seconds) {
+      return new Date(Math.floor(date.getTime() / (seconds * 1000)) * seconds * 1000);
+    }
+
+    const ws = new WebSocket("wss://my-forex-app.onrender.com/ws");
+    ws.onmessage = (e) => {
+      const { symbol, price, timestamp } = JSON.parse(e.data);
+      if (symbol !== currentSymbol) return;
+
+      const date = new Date(timestamp);
+      const time = roundToInterval(date, interval);
+      const ts = Math.floor(time.getTime() / 1000);
+
+      let lastBar = bars[bars.length - 1];
+      if (!lastBar || lastBar.time !== ts) {
+        bars.push({
+          time: ts,
+          open: price,
+          high: price,
+          low: price,
+          close: price,
+        });
+      } else {
+        lastBar.high = Math.max(lastBar.high, price);
+        lastBar.low = Math.min(lastBar.low, price);
+        lastBar.close = price;
+      }
+      candleSeries.setData(bars);
+    };
+
+    document.getElementById("interval").addEventListener("change", (e) => {
+      interval = parseInt(e.target.value);
+      bars = [];
+      candleSeries.setData([]);
+    });
+
+    document.getElementById("symbol").addEventListener("change", (e) => {
+      currentSymbol = e.target.value;
+      bars = [];
+      candleSeries.setData([]);
+    });
+  </script>
+</body>
+</html>
